@@ -1,0 +1,169 @@
+import streamlit as st
+import json
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+from datetime import datetime
+
+# -------------------------
+# Setup
+# -------------------------
+load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+
+st.set_page_config(page_title="Blissful Gallery", layout="wide")
+
+# -------------------------
+# Helper Functions
+# -------------------------
+
+def load_data(file):
+    with open(file, "r") as f:
+        return json.load(f)
+
+def save_data(file, data):
+    with open(file, "w") as f:
+        json.dump(data, f, indent=4)
+
+def ai_generate(prompt):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+
+# -------------------------
+# Load Data
+# -------------------------
+creators = load_data("creators.json")
+artworks = load_data("artworks.json")
+
+# -------------------------
+# Navigation
+# -------------------------
+menu = st.sidebar.radio("Navigation", [
+    "Home",
+    "Explore",
+    "Apply as Creator",
+    "Admin Login"
+])
+
+# -------------------------
+# HOME
+# -------------------------
+if menu == "Home":
+    st.title("Blissful Gallery")
+    st.subheader("A Sacred Digital Sanctuary for Spiritual Creators of All Paths")
+    st.write("---")
+
+    featured = [art for art in artworks if art["approved"]]
+
+    if featured:
+        for art in featured[-3:]:
+            st.image(art["image"])
+            st.markdown(f"**{art['title']}**")
+            st.write(art["description"])
+            st.write("By:", art["artist"])
+            st.write("---")
+    else:
+        st.info("No artworks featured yet.")
+
+# -------------------------
+# EXPLORE
+# -------------------------
+elif menu == "Explore":
+    st.title("Explore Blissful Gallery")
+
+    approved_art = [art for art in artworks if art["approved"]]
+
+    if approved_art:
+        for art in approved_art:
+            st.image(art["image"])
+            st.markdown(f"### {art['title']}")
+            st.write(art["description"])
+            st.write("Artist:", art["artist"])
+
+            if st.button(f"Interpret {art['title']}"):
+                interpretation = ai_generate(
+                    f"Give a spiritual interpretation of this artwork: {art['description']}"
+                )
+                st.write("🔮 Interpretation:")
+                st.write(interpretation)
+
+            st.write("---")
+    else:
+        st.warning("No approved artworks yet.")
+
+# -------------------------
+# APPLY AS CREATOR
+# -------------------------
+elif menu == "Apply as Creator":
+    st.title("Apply as a Creator")
+
+    name = st.text_input("Your Name / Spiritual Name")
+    bio = st.text_area("Short Bio")
+    intention = st.text_area("Why do you create spiritual art?")
+    image = st.text_input("Paste Image URL")
+    title = st.text_input("Artwork Title")
+    description = st.text_area("Artwork Description")
+
+    if st.button("Submit Application"):
+        if name and bio and image:
+            new_creator = {
+                "name": name,
+                "bio": bio,
+                "intention": intention,
+                "approved": False
+            }
+
+            creators.append(new_creator)
+            save_data("creators.json", creators)
+
+            new_art = {
+                "artist": name,
+                "title": title,
+                "description": description,
+                "image": image,
+                "approved": False,
+                "date": str(datetime.now())
+            }
+
+            artworks.append(new_art)
+            save_data("artworks.json", artworks)
+
+            st.success("Application submitted. Awaiting approval.")
+        else:
+            st.error("Please fill required fields.")
+
+# -------------------------
+# ADMIN LOGIN
+# -------------------------
+elif menu == "Admin Login":
+    st.title("Admin Access")
+
+    password = st.text_input("Enter Admin Password", type="password")
+
+    if password == ADMIN_PASSWORD:
+        st.success("Access Granted")
+
+        st.subheader("Pending Creators")
+        for creator in creators:
+            if not creator["approved"]:
+                st.write(creator["name"])
+                if st.button(f"Approve {creator['name']}"):
+                    creator["approved"] = True
+                    save_data("creators.json", creators)
+                    st.success("Creator Approved")
+
+        st.subheader("Pending Artworks")
+        for art in artworks:
+            if not art["approved"]:
+                st.write(art["title"], "by", art["artist"])
+                if st.button(f"Approve {art['title']}"):
+                    art["approved"] = True
+                    save_data("artworks.json", artworks)
+                    st.success("Artwork Approved")
+
+    elif password != "":
+        st.error("Incorrect password.")
