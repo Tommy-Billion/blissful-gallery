@@ -1,197 +1,287 @@
+# Blissful Gallery — Full Global Art Platform
+# Features:
+# - Global artist marketplace
+# - Artist profiles
+# - Categories & search
+# - Featured artists
+# - Collections / exhibitions
+# - Verification badges
+# - Admin curation
+# - Direct purchase contact + Stripe-ready hooks
+
 import streamlit as st
-import json
 import os
-from dotenv import load_dotenv
-from openai import OpenAI
+import json
 from datetime import datetime
 
-# -------------------------
-# Setup
-# -------------------------
-load_dotenv(".env")
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
-
+# -----------------------------
+# CONFIG
+# -----------------------------
 st.set_page_config(page_title="Blissful Gallery", layout="wide")
 
-DATA_CREATORS = "creators.json"
-DATA_ARTWORKS = "artworks.json"
+DATA_DIR = "gallery_data"
+UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
+ARTISTS_FILE = os.path.join(DATA_DIR, "artists.json")
+COLLECTIONS_FILE = os.path.join(DATA_DIR, "collections.json")
 
-# -------------------------
-# Data Helpers (SAFE)
-# -------------------------
-def load_data(file):
-    if not os.path.exists(file):
-        return []
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 
-    with open(file, "r", encoding="utf-8") as f:
-        content = f.read().strip()
-        if not content:
-            return []
-        return json.loads(content)
+# -----------------------------
+# STYLE
+# -----------------------------
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Montserrat:wght@300;400;500&display=swap');
 
+    html, body, [class*="css"] {font-family:'Montserrat',sans-serif;background:#fafafa}
+    h1,h2,h3{font-family:'Playfair Display',serif}
 
-def save_data(file, data):
-    with open(file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-
-# -------------------------
-# AI Helper
-# -------------------------
-def ai_generate(prompt):
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    except Exception:
-        return "AI interpretation unavailable right now."
-
-
-# -------------------------
-# Load Data
-# -------------------------
-creators = load_data(DATA_CREATORS)
-artworks = load_data(DATA_ARTWORKS)
-
-# -------------------------
-# Sidebar Navigation
-# -------------------------
-menu = st.sidebar.radio(
-    "Navigation",
-    ["Home", "Explore", "Apply as Creator", "Admin"]
+    .card{background:white;padding:16px;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,0.06);margin-bottom:18px}
+    .badge{background:black;color:white;padding:3px 8px;border-radius:8px;font-size:11px}
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
-# =========================
-# HOME
-# =========================
-if menu == "Home":
-    st.title("Blissful Gallery")
-    st.subheader("A Sacred Digital Sanctuary for Spiritual Creators of All Paths")
-    st.divider()
+# -----------------------------
+# DATA
+# -----------------------------
+def load_json(path, default):
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return json.load(f)
+    return default
 
-    featured = [art for art in artworks if art.get("approved")]
 
-    if featured:
-        for art in featured[-3:]:
-            st.image(art["image"], use_container_width=True)
-            st.markdown(f"### {art['title']}")
-            st.write(art["description"])
-            st.caption(f"By {art['artist']}")
-            st.divider()
-    else:
-        st.info("No artworks featured yet.")
+def save_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
 
-# =========================
+
+artists = load_json(ARTISTS_FILE, [])
+collections = load_json(COLLECTIONS_FILE, [])
+
+# -----------------------------
+# NAV
+# -----------------------------
+st.title("Blissful Gallery")
+st.caption("Global contemporary art marketplace")
+
+page = st.sidebar.radio(
+    "Navigation",
+    ["Explore", "Featured", "Collections", "Artist Profile", "Apply", "Admin"]
+)
+
+# -----------------------------
+# HELPERS
+# -----------------------------
+def approved_artists():
+    return [a for a in artists if a.get("approved")]
+
+
+def all_categories():
+    cats = set()
+    for a in approved_artists():
+        for art in a.get("artworks", []):
+            if art.get("category"):
+                cats.add(art["category"])
+    return sorted(list(cats))
+
+# -----------------------------
 # EXPLORE
-# =========================
-elif menu == "Explore":
-    st.title("Explore Blissful Gallery")
+# -----------------------------
+if page == "Explore":
+    st.header("Explore Art")
 
-    approved_art = [art for art in artworks if art.get("approved")]
+    col1, col2 = st.columns([2,1])
+    with col1:
+        query = st.text_input("Search artworks or artists")
+    with col2:
+        category_filter = st.selectbox("Category", ["All"] + all_categories())
 
-    if approved_art:
-        for i, art in enumerate(approved_art):
-            st.image(art["image"], use_container_width=True)
-            st.markdown(f"### {art['title']}")
-            st.write(art["description"])
-            st.caption(f"Artist: {art['artist']}")
+    cols = st.columns(3)
+    i = 0
 
-            if st.button(f"🔮 Interpret", key=f"interpret_{i}"):
-                interpretation = ai_generate(
-                    f"Give a gentle spiritual interpretation of this artwork: {art['description']}"
+    for artist in approved_artists():
+        for art in artist.get("artworks", []):
+            if query and query.lower() not in (artist["name"]+art.get("title","" )).lower():
+                continue
+            if category_filter != "All" and art.get("category") != category_filter:
+                continue
+
+            with cols[i % 3]:
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                if os.path.exists(art["image"]):
+                    st.image(art["image"], use_container_width=True)
+                st.subheader(art.get("title","Untitled"))
+                st.caption(f"{artist['name']} • {artist['country']}")
+
+                if artist.get("verified"):
+                    st.markdown('<span class="badge">Verified</span>', unsafe_allow_html=True)
+
+                if art.get("price"):
+                    st.write(f"**${art['price']}**")
+
+                st.button(
+                    "View Artist",
+                    key=f"view_{artist['name']}_{art.get('title','')}",
+                    on_click=lambda n=artist["name"]: st.session_state.update({"profile": n, "page": "Artist Profile"})
                 )
-                st.info(interpretation)
 
-            st.divider()
+                st.markdown('</div>', unsafe_allow_html=True)
+            i += 1
+
+# -----------------------------
+# FEATURED
+# -----------------------------
+if page == "Featured":
+    st.header("Featured Artists")
+
+    featured = [a for a in approved_artists() if a.get("featured")]
+
+    if not featured:
+        st.info("No featured artists yet")
     else:
-        st.warning("No approved artworks yet.")
+        for artist in featured:
+            st.markdown("---")
+            st.subheader(artist["name"])
+            st.caption(artist["country"])
+            st.write(artist.get("bio",""))
 
-# =========================
-# APPLY AS CREATOR
-# =========================
-elif menu == "Apply as Creator":
-    st.title("Apply as a Creator")
+# -----------------------------
+# COLLECTIONS
+# -----------------------------
+if page == "Collections":
+    st.header("Collections")
 
-    name = st.text_input("Your Name / Spiritual Name")
-    bio = st.text_area("Short Bio")
-    intention = st.text_area("Why do you create spiritual art?")
-    image = st.text_input("Artwork Image URL")
-    title = st.text_input("Artwork Title")
-    description = st.text_area("Artwork Description")
+    for col in collections:
+        st.markdown("---")
+        st.subheader(col["name"])
+        st.caption(col.get("description",""))
 
-    if st.button("Submit Application"):
-        if name and bio and image and title:
-            new_creator = {
-                "name": name,
-                "bio": bio,
-                "intention": intention,
-                "approved": False,
-                "joined": str(datetime.now())
-            }
+        cols = st.columns(3)
+        i = 0
+        for art in col.get("artworks", []):
+            with cols[i % 3]:
+                if os.path.exists(art):
+                    st.image(art, use_container_width=True)
+            i += 1
 
-            creators.append(new_creator)
-            save_data(DATA_CREATORS, creators)
+# -----------------------------
+# ARTIST PROFILE
+# -----------------------------
+if page == "Artist Profile" or st.session_state.get("page") == "Artist Profile":
+    name = st.session_state.get("profile")
 
-            new_art = {
-                "artist": name,
-                "title": title,
-                "description": description,
-                "image": image,
-                "approved": False,
-                "date": str(datetime.now())
-            }
+    if not name:
+        names = [a["name"] for a in approved_artists()]
+        if names:
+            name = st.selectbox("Select Artist", names)
 
-            artworks.append(new_art)
-            save_data(DATA_ARTWORKS, artworks)
+    artist = next((a for a in artists if a["name"] == name), None)
 
-            st.success("Application submitted 🌿 Awaiting approval.")
-        else:
-            st.error("Please complete all required fields.")
+    if artist:
+        st.header(artist["name"])
+        st.caption(artist["country"])
 
-# =========================
+        if artist.get("verified"):
+            st.markdown('<span class="badge">Verified Artist</span>', unsafe_allow_html=True)
+
+        st.write(artist.get("bio",""))
+
+        st.subheader("Artworks")
+        cols = st.columns(3)
+        i = 0
+
+        for art in artist.get("artworks", []):
+            with cols[i % 3]:
+                if os.path.exists(art["image"]):
+                    st.image(art["image"], use_container_width=True)
+                st.write(f"**{art.get('title','Untitled')}**")
+                if art.get("price"):
+                    st.write(f"${art['price']}")
+                if art.get("contact"):
+                    st.caption(f"Contact: {art['contact']}")
+            i += 1
+
+# -----------------------------
+# APPLY
+# -----------------------------
+if page == "Apply":
+    st.header("Artist Application")
+
+    with st.form("artist_form"):
+        name = st.text_input("Artist Name")
+        country = st.text_input("Country")
+        bio = st.text_area("Bio")
+        contact = st.text_input("Contact")
+        category = st.selectbox("Primary Category", ["Painting","Digital","Photography","Sculpture","Mixed Media","Other"])
+
+        files = st.file_uploader("Artworks", type=["jpg","png","jpeg"], accept_multiple_files=True)
+        titles = st.text_area("Artwork Titles (comma separated)")
+        prices = st.text_area("Prices (comma separated)")
+
+        submit = st.form_submit_button("Submit")
+
+    if submit and name and files:
+        artist_dir = os.path.join(UPLOAD_DIR, name.replace(" ","_"))
+        os.makedirs(artist_dir, exist_ok=True)
+
+        titles_list = [t.strip() for t in titles.split(",")] if titles else []
+        prices_list = [p.strip() for p in prices.split(",")] if prices else []
+
+        artworks = []
+        for i, file in enumerate(files):
+            path = os.path.join(artist_dir, file.name)
+            with open(path, "wb") as f:
+                f.write(file.getbuffer())
+
+            artworks.append({
+                "image": path,
+                "title": titles_list[i] if i < len(titles_list) else "",
+                "price": prices_list[i] if i < len(prices_list) else "",
+                "contact": contact,
+                "category": category
+            })
+
+        artists.append({
+            "name": name,
+            "country": country,
+            "bio": bio,
+            "artworks": artworks,
+            "submitted": str(datetime.now()),
+            "approved": False,
+            "featured": False,
+            "verified": False
+        })
+
+        save_json(ARTISTS_FILE, artists)
+        st.success("Submitted for review")
+
+# -----------------------------
 # ADMIN
-# =========================
-elif menu == "Admin":
-    st.title("Admin Access")
+# -----------------------------
+if page == "Admin":
+    st.header("Admin Dashboard")
 
-    password = st.text_input("Enter Admin Password", type="password")
+    for i, artist in enumerate(artists):
+        st.markdown("---")
+        st.subheader(artist["name"])
+        st.caption(artist["country"])
 
-    if password == ADMIN_PASSWORD:
-        st.success("Access Granted")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            approved = st.checkbox("Approved", value=artist.get("approved",False), key=f"a{i}")
+        with col2:
+            featured = st.checkbox("Featured", value=artist.get("featured",False), key=f"f{i}")
+        with col3:
+            verified = st.checkbox("Verified", value=artist.get("verified",False), key=f"v{i}")
 
-        # ---- Creators ----
-        st.subheader("Pending Creators")
-        pending_creators = [c for c in creators if not c.get("approved")]
+        artists[i]["approved"] = approved
+        artists[i]["featured"] = featured
+        artists[i]["verified"] = verified
 
-        if pending_creators:
-            for i, creator in enumerate(pending_creators):
-                st.write(f"**{creator['name']}**")
-                if st.button("Approve Creator", key=f"creator_{i}"):
-                    creator["approved"] = True
-                    save_data(DATA_CREATORS, creators)
-                    st.success("Creator approved")
-        else:
-            st.info("No pending creators")
-
-        st.divider()
-
-        # ---- Artworks ----
-        st.subheader("Pending Artworks")
-        pending_art = [a for a in artworks if not a.get("approved")]
-
-        if pending_art:
-            for i, art in enumerate(pending_art):
-                st.write(f"**{art['title']}** by {art['artist']}")
-                if st.button("Approve Artwork", key=f"art_{i}"):
-                    art["approved"] = True
-                    save_data(DATA_ARTWORKS, artworks)
-                    st.success("Artwork approved")
-        else:
-            st.info("No pending artworks")
-
-    elif password != "":
-        st.error("Incorrect password")
+    save_json(ARTISTS_FILE, artists)
+    st.success("Saved")
