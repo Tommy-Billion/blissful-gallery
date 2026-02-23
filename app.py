@@ -35,12 +35,62 @@ st.markdown(
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Montserrat:wght@300;400;500&display=swap');
 
-    html, body, [class*="css"] {font-family:'Montserrat',sans-serif;background:#fafafa}
-    h1,h2,h3{font-family:'Playfair Display',serif}
+    html, body, [class*="css"] {
+        font-family: 'Montserrat', sans-serif;
+        background:
+            radial-gradient(circle at 15% 20%, rgba(255,215,180,0.25), transparent 45%),
+            radial-gradient(circle at 85% 25%, rgba(200,220,255,0.25), transparent 45%),
+            radial-gradient(circle at 50% 85%, rgba(220,255,220,0.25), transparent 45%),
+            url("https://www.transparenttextures.com/patterns/canvas.png"),
+            linear-gradient(180deg, #f6f7fb 0%, #eef1f6 100%);
+        background-attachment: fixed;
+    }
 
-    .card{background:white;padding:16px;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,0.06);margin-bottom:18px}
-    .badge{background:black;color:white;padding:3px 8px;border-radius:8px;font-size:11px}
-    </style>
+    h1, h2, h3 {
+        font-family: 'Playfair Display', serif;
+        letter-spacing: 0.6px;
+    }
+
+    .card {
+        background: rgba(255,255,255,0.82);
+        backdrop-filter: blur(10px);
+        padding: 18px;
+        border-radius: 20px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.10);
+        margin-bottom: 20px;
+        border: 1px solid rgba(212,175,55,0.25);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 30% 30%, rgba(212,175,55,0.18), transparent 60%);
+        pointer-events: none;
+    }
+
+    .badge {
+        background: linear-gradient(135deg,#d4af37,#8c6b1f);
+        color: white;
+        padding: 4px 9px;
+        border-radius: 10px;
+        font-size: 11px;
+        letter-spacing: 0.4px;
+    }
+
+    /* subtle sacred geometry overlay */
+    body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: radial-gradient(circle at center, rgba(212,175,55,0.06) 1px, transparent 1px);
+        background-size: 120px 120px;
+        pointer-events: none;
+        opacity: 0.4;
+    }
+</style>
     """,
     unsafe_allow_html=True
 )
