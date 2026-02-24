@@ -8,6 +8,9 @@ from datetime import datetime
 # -----------------------------
 st.set_page_config(page_title="Blissful Gallery", page_icon="assets/logo.png", layout="wide")
 
+st.image("assets/logo.png", width=200)
+st.title("Blissful Gallery")
+
 DATA_DIR = "gallery_data"
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 ARTISTS_FILE = os.path.join(DATA_DIR, "creators.json")
