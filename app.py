@@ -63,8 +63,8 @@ logo_header_path = os.path.join(ASSETS_FOLDER, "logo_header.png")
 if os.path.exists(logo_header_path):
     st.image(logo_header_path, width=150)
 
-st.title("🌿 Blissful Gallery")
-st.caption("Universal Spiritual Art Sanctuary")
+st.title("Blissful Gallery")
+st.caption("Universal Art Gallery")
 
 # ====================================
 # NAVIGATION
