@@ -10,6 +10,7 @@ from PIL import Image
 
 st.set_page_config(
     page_title="Blissful Gallery",
+    page_icon="assets/logo_favicon.png",
     layout="wide"
 )
 
