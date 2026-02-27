@@ -353,8 +353,4 @@ if menu == "Admin Panel":
 
             save_artists(artists)
 
-<<<<<<< HEAD
             st.rerun()
-=======
-            st.rerun()
->>>>>>> e7410ccee0d3999189e9169209f14feb2ffc5b81
