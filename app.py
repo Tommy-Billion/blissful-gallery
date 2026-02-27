@@ -1,261 +1,356 @@
 import streamlit as st
-import os
 import json
+import os
+from datetime import datetime
+from PIL import Image
 
-# -----------------------------
-# CONFIG
-# -----------------------------
-LOGO_HEADER = "assets/logo_header.png"
-LOGO_ICON = "assets/logo_icon.png"
-LOGO_FAVICON = "assets/logo_favicon.png"
-
-DATA_DIR = "gallery_data"
-UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
-ARTISTS_FILE = os.path.join(DATA_DIR, "creators.json")
-ARTWORKS_FILE = os.path.join(DATA_DIR, "artworks.json")
-
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(DATA_DIR, exist_ok=True)
+# ====================================
+# BLISSFUL GALLERY CONFIGURATION
+# ====================================
 
 st.set_page_config(
     page_title="Blissful Gallery",
-    page_icon=LOGO_FAVICON,
     layout="wide"
 )
 
-# -----------------------------
-# STYLE
-# -----------------------------
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Montserrat:wght@300;400;500&display=swap');
+# ====================================
+# AUTO CREATE FOLDERS
+# ====================================
 
-    html, body, [class*="css"] {
-        font-family:'Montserrat',sans-serif;
-        background: radial-gradient(circle at 15% 20%, rgba(255,215,180,0.25), transparent 45%),
-                    radial-gradient(circle at 85% 25%, rgba(200,220,255,0.25), transparent 45%),
-                    radial-gradient(circle at 50% 85%, rgba(220,255,220,0.25), transparent 45%),
-                    url('https://www.transparenttextures.com/patterns/canvas.png'),
-                    linear-gradient(180deg, #f6f7fb 0%, #eef1f6 100%);
-        background-attachment: fixed;
-    }
+DATA_FOLDER = "data"
+UPLOAD_FOLDER = "uploads"
+ASSETS_FOLDER = "assets"
 
-    h1,h2,h3{
-        font-family:'Playfair Display',serif;
-        letter-spacing:0.6px;
-    }
+os.makedirs(DATA_FOLDER, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(ASSETS_FOLDER, exist_ok=True)
 
-    .card{
-        background: rgba(255,255,255,0.82);
-        backdrop-filter: blur(10px);
-        padding: 18px;
-        border-radius: 20px;
-        box-shadow:0 8px 30px rgba(0,0,0,0.10);
-        margin-bottom:20px;
-        border:1px solid rgba(212,175,55,0.25);
-        position:relative;
-        overflow:hidden;
-    }
+DATA_FILE = os.path.join(DATA_FOLDER, "artists.json")
 
-    .card::before{
-        content:"";
-        position:absolute;
-        inset:0;
-        background: radial-gradient(circle at 30% 30%, rgba(212,175,55,0.18), transparent 60%);
-        pointer-events:none;
-    }
 
-    .badge{
-        background: linear-gradient(135deg,#d4af37,#8c6b1f);
-        color:white;
-        padding:4px 9px;
-        border-radius:10px;
-        font-size:11px;
-        letter-spacing:0.4px;
-    }
+# ====================================
+# INITIALIZE DATABASE
+# ====================================
 
-    body::after{
-        content:"";
-        position:fixed;
-        inset:0;
-        background-image: radial-gradient(circle at center, rgba(212,175,55,0.06) 1px, transparent 1px);
-        background-size:120px 120px;
-        pointer-events:none;
-        opacity:0.4;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+if not os.path.exists(DATA_FILE):
 
-# -----------------------------
-# HEADER (STREAMLIT SAFE)
-# -----------------------------
-col1, col2 = st.columns([1,6])
+    with open(DATA_FILE, "w") as f:
 
-with col1:
-    st.image(LOGO_ICON, width=64)
+        json.dump([], f)
 
-with col2:
-    st.markdown(
-        "<h1 style='margin-top:10px;'>Blissful Gallery</h1>",
-        unsafe_allow_html=True
-    )
 
-# -----------------------------
-# DATA MANAGEMENT
-# -----------------------------
-def load_json(path, default):
-    if os.path.exists(path):
-        with open(path, "r") as f:
+# ====================================
+# SAFE DATABASE LOAD
+# ====================================
+
+def load_artists():
+
+    try:
+
+        with open(DATA_FILE,"r") as f:
+
             return json.load(f)
-    return default
 
-def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+    except:
 
-artists = load_json(ARTISTS_FILE, [])
-artworks = load_json(ARTWORKS_FILE, [])
+        return []
 
-# -----------------------------
+
+# ====================================
+# SAFE DATABASE SAVE
+# ====================================
+
+def save_artists(data):
+
+    with open(DATA_FILE,"w") as f:
+
+        json.dump(data,f,indent=4)
+
+
+# ====================================
+# LOGO
+# ====================================
+
+logo_path = "assets/blissful_logo.png"
+
+if os.path.exists(logo_path):
+
+    st.image(logo_path, width=150)
+
+st.title("🌿 Blissful Gallery")
+st.caption("Universal Spiritual Art Sanctuary")
+
+
+# ====================================
 # NAVIGATION
-# -----------------------------
-page = st.sidebar.radio(
-    "Navigation",
-    ["Explore", "Featured", "Collections", "Artist Profile", "Apply", "Admin"]
+# ====================================
+
+menu = st.sidebar.selectbox(
+
+    "Menu",
+
+    [
+
+        "Gallery",
+
+        "Apply as Artist",
+
+        "Admin Panel"
+
+    ]
 )
 
-# -----------------------------
-# EXPLORE
-# -----------------------------
-if page == "Explore":
-    st.subheader("Explore Artworks")
 
-    search = st.text_input("Search by artwork or artist")
+# ====================================
+# GALLERY PAGE
+# ====================================
 
-    categories = sorted(list(set([a["category"] for a in artworks]))) if artworks else []
-    category_filter = st.selectbox("Filter by category", ["All"] + categories)
+if menu == "Gallery":
 
-    for art in artworks:
-        if (
-            (search.lower() in art["title"].lower() or search.lower() in art["artist"].lower())
-            and (category_filter == "All" or art["category"] == category_filter)
-        ):
-            st.markdown(f"""
-            <div class='card'>
-                <img src="{art['image']}" style="width:100%;border-radius:10px;">
-                <h3>{art['title']}</h3>
-                <p>By {art['artist']}</p>
-                <span class='badge'>{art['category']}</span>
-            </div>
-            """, unsafe_allow_html=True)
+    st.header("Art Gallery")
 
-# -----------------------------
-# FEATURED
-# -----------------------------
-elif page == "Featured":
-    st.subheader("Featured Artists")
+    artists = load_artists()
 
-    for artist in artists:
-        if artist.get("featured"):
-            st.markdown(f"""
-            <div class='card'>
-                <h3>{artist['name']}</h3>
-                <p>{artist['bio']}</p>
-            </div>
-            """, unsafe_allow_html=True)
+    approved_artists = [
 
-# -----------------------------
-# COLLECTIONS
-# -----------------------------
-elif page == "Collections":
-    st.subheader("Collections")
-    st.info("Collections feature coming soon")
+        a for a in artists
 
-# -----------------------------
-# ARTIST PROFILE
-# -----------------------------
-elif page == "Artist Profile":
-    st.subheader("Artist Profile")
+        if a["status"] == "Approved"
 
-    if artists:
-        names = [a["name"] for a in artists]
-        selected = st.selectbox("Select artist", names)
+    ]
 
-        profile = next((a for a in artists if a["name"] == selected), None)
 
-        if profile:
-            st.markdown(f"<h2>{profile['name']}</h2><p>{profile['bio']}</p>", unsafe_allow_html=True)
+    if len(approved_artists) == 0:
 
-            artist_works = [a for a in artworks if a["artist"] == selected]
-            for art in artist_works:
-                st.image(art["image"], caption=art["title"], use_column_width=True)
+        st.info("No approved artworks yet.")
+
+
     else:
-        st.info("No artists yet")
 
-# -----------------------------
-# APPLY
-# -----------------------------
-elif page == "Apply":
-    st.subheader("Apply as Artist")
+        cols = st.columns(3)
 
-    name = st.text_input("Full Name")
-    bio = st.text_area("Short Bio")
-    category = st.text_input("Category")
+        index = 0
 
-    uploads = st.file_uploader(
-        "Upload Artwork Images",
-        type=["png","jpg","jpeg"],
-        accept_multiple_files=True
+        for artist in approved_artists:
+
+            with cols[index % 3]:
+
+                if os.path.exists(artist["image_path"]):
+
+                    st.image(artist["image_path"])
+
+                else:
+
+                    st.warning("Image Missing")
+
+
+                st.write("**Artist:**",artist["name"])
+
+                st.write("**Title:**",artist["title"])
+
+                st.write("**About:**",artist["bio"])
+
+                st.caption(artist["date"])
+
+            index += 1
+
+
+
+# ====================================
+# ARTIST APPLICATION
+# ====================================
+
+if menu == "Apply as Artist":
+
+    st.header("Artist Application")
+
+    name = st.text_input("Artist Name")
+
+    title = st.text_input("Artwork Title")
+
+    bio = st.text_area("Artist Bio")
+
+    uploaded_file = st.file_uploader(
+
+        "Upload Artwork",
+
+        type=["png","jpg","jpeg"]
+
     )
 
-    if st.button("Submit Application"):
-        if name and uploads:
-            artists.append({
-                "name": name,
-                "bio": bio,
-                "featured": False,
-                "verified": False
-            })
-            save_json(ARTISTS_FILE, artists)
 
-            for file in uploads:
-                save_path = os.path.join(UPLOAD_DIR, file.name)
-                with open(save_path, "wb") as f:
-                    f.write(file.getbuffer())
+    submit = st.button("Submit Application")
 
-                artworks.append({
-                    "title": file.name,
-                    "artist": name,
-                    "image": save_path,
-                    "category": category
-                })
 
-            save_json(ARTWORKS_FILE, artworks)
-            st.success("Application submitted")
+    if submit:
+
+        if name == "" or title == "" or bio == "" or uploaded_file is None:
+
+            st.error("Please fill all fields.")
+
+
         else:
-            st.warning("Name and artworks required")
 
-# -----------------------------
-# ADMIN
-# -----------------------------
-elif page == "Admin":
-    st.subheader("Admin Dashboard")
+            try:
 
-    for i, artist in enumerate(artists):
-        c1, c2, c3 = st.columns([3,1,1])
+                artists = load_artists()
 
-        with c1:
-            st.write(artist["name"])
 
-        with c2:
-            if st.button("Feature", key=f"f{i}"):
-                artists[i]["featured"] = True
-                save_json(ARTISTS_FILE, artists)
+                # Duplicate protection
 
-        with c3:
-            if st.button("Verify", key=f"v{i}"):
-                artists[i]["verified"] = True
-                save_json(ARTISTS_FILE, artists)
+                for artist in artists:
+
+                    if artist["title"].lower() == title.lower():
+
+                        st.error("Artwork title already exists.")
+
+                        st.stop()
+
+
+                # Safe filename
+
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
+                safe_name = name.replace(" ","_")
+
+                filename = f"{safe_name}_{timestamp}.jpg"
+
+                file_path = os.path.join(
+
+                    UPLOAD_FOLDER,
+
+                    filename
+
+                )
+
+
+                # Verify image
+
+                image = Image.open(uploaded_file)
+
+                image.save(file_path)
+
+
+                # Artist record
+
+                new_artist = {
+
+                    "name":name,
+
+                    "title":title,
+
+                    "bio":bio,
+
+                    "image_path":file_path,
+
+                    "date":datetime.now().strftime("%Y-%m-%d"),
+
+                    "status":"Pending"
+
+                }
+
+
+                artists.append(new_artist)
+
+                save_artists(artists)
+
+
+                st.success("Application Submitted!")
+
+                st.info("Awaiting Approval")
+
+                st.image(file_path)
+
+
+            except Exception as e:
+
+                st.error("Upload Failed")
+
+                st.write(e)
+
+
+
+# ====================================
+# ADMIN PANEL
+# ====================================
+
+if menu == "Admin Panel":
+
+    st.header("Admin Panel")
+
+
+    password = st.text_input(
+
+        "Admin Password",
+
+        type="password"
+
+    )
+
+
+    if password != "blissfuladmin":
+
+        st.warning("Enter admin password")
+
+        st.stop()
+
+
+    artists = load_artists()
+
+    pending = [
+
+        a for a in artists
+
+        if a["status"] == "Pending"
+
+    ]
+
+
+    if len(pending) == 0:
+
+        st.success("No pending artists.")
+
+
+    for artist in pending:
+
+        st.divider()
+
+        st.write("Artist:",artist["name"])
+
+        st.write("Title:",artist["title"])
+
+        st.write("Bio:",artist["bio"])
+
+
+        if os.path.exists(artist["image_path"]):
+
+            st.image(artist["image_path"])
+
+
+        col1,col2 = st.columns(2)
+
+
+        if col1.button(
+
+            f"Approve {artist['title']}"
+
+        ):
+
+            artist["status"] = "Approved"
+
+            save_artists(artists)
+
+            st.rerun()
+
+
+        if col2.button(
+
+            f"Reject {artist['title']}"
+
+        ):
+
+            artists.remove(artist)
+
+            save_artists(artists)
+
+            st.rerun()
