@@ -10,7 +10,7 @@ from PIL import Image
 
 st.set_page_config(
     page_title="Blissful Gallery",
-    page_icon="assets/logo_favicon.png",  # Browser favicon
+    page_icon="assets/logo_favicon.png",
     layout="wide"
 )
 
@@ -42,7 +42,7 @@ if not os.path.exists(DATA_FILE):
 
 def load_artists():
     try:
-        with open(DATA_FILE,"r") as f:
+        with open(DATA_FILE, "r") as f:
             return json.load(f)
     except:
         return []
@@ -52,11 +52,18 @@ def load_artists():
 # ====================================
 
 def save_artists(data):
-    with open(DATA_FILE,"w") as f:
-        json.dump(data,f,indent=4)
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
 # ====================================
-# LOGO IN HEADER
+# SESSION STATE
+# ====================================
+
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+# ====================================
+# HEADER LOGO
 # ====================================
 
 logo_header_path = os.path.join(ASSETS_FOLDER, "logo_header.png")
@@ -72,11 +79,7 @@ st.caption("Universal Art Gallery")
 
 menu = st.sidebar.selectbox(
     "Menu",
-    [
-        "Gallery",
-        "Apply as Artist",
-        "Admin Panel"
-    ]
+    ["Gallery", "Apply as Artist", "Admin Panel"]
 )
 
 # ====================================
@@ -107,45 +110,37 @@ if menu == "Gallery":
             index += 1
 
 # ====================================
-# ARTIST APPLICATION
+# APPLY AS ARTIST
 # ====================================
 
 if menu == "Apply as Artist":
     st.header("Artist Application")
+
     name = st.text_input("Artist Name")
     title = st.text_input("Artwork Title")
     bio = st.text_area("Artist Bio")
-    uploaded_file = st.file_uploader(
-        "Upload Artwork",
-        type=["png","jpg","jpeg"]
-    )
+    uploaded_file = st.file_uploader("Upload Artwork", type=["png", "jpg", "jpeg"])
 
-    submit = st.button("Submit Application")
-
-    if submit:
-        if name == "" or title == "" or bio == "" or uploaded_file is None:
+    if st.button("Submit Application"):
+        if not name or not title or not bio or uploaded_file is None:
             st.error("Please fill all fields.")
         else:
             try:
                 artists = load_artists()
 
-                # Duplicate protection
                 for artist in artists:
                     if artist["title"].lower() == title.lower():
                         st.error("Artwork title already exists.")
                         st.stop()
 
-                # Safe filename
                 timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                safe_name = name.replace(" ","_")
+                safe_name = name.replace(" ", "_")
                 filename = f"{safe_name}_{timestamp}.jpg"
                 file_path = os.path.join(UPLOAD_FOLDER, filename)
 
-                # Verify image
                 image = Image.open(uploaded_file)
                 image.save(file_path)
 
-                # Artist record
                 new_artist = {
                     "name": name,
                     "title": title,
@@ -171,39 +166,52 @@ if menu == "Apply as Artist":
 # ====================================
 
 if menu == "Admin Panel":
+
     st.header("Admin Panel")
-    password = st.text_input(
-        "Admin Password",
-        type="password"
-    )
 
-    if password != "blissfuladmin":
-        st.warning("Enter admin password")
-        st.stop()
+    if not st.session_state.admin_logged_in:
 
-    artists = load_artists()
-    pending = [a for a in artists if a["status"] == "Pending"]
+        with st.form("admin_login_form"):
+            password = st.text_input("Enter Admin Password", type="password")
+            submitted = st.form_submit_button("Enter")
 
-    if len(pending) == 0:
-        st.success("No pending artists.")
+        if submitted:
+            if password == st.secrets["ADMIN_PASSWORD"]:
+                st.session_state.admin_logged_in = True
+                st.success("Access Granted")
+                st.rerun()
+            else:
+                st.error("Incorrect Password")
 
-    for artist in pending:
-        st.divider()
-        st.write("Artist:", artist["name"])
-        st.write("Title:", artist["title"])
-        st.write("Bio:", artist["bio"])
+    else:
 
-        if os.path.exists(artist["image_path"]):
-            st.image(artist["image_path"])
-
-        col1, col2 = st.columns(2)
-
-        if col1.button(f"Approve {artist['title']}"):
-            artist["status"] = "Approved"
-            save_artists(artists)
+        if st.button("Logout"):
+            st.session_state.admin_logged_in = False
             st.rerun()
 
-        if col2.button(f"Reject {artist['title']}"):
-            artists.remove(artist)
-            save_artists(artists)
-            st.rerun()
+        artists = load_artists()
+        pending = [a for a in artists if a["status"] == "Pending"]
+
+        if len(pending) == 0:
+            st.success("No pending artists.")
+
+        for artist in pending:
+            st.divider()
+            st.write("Artist:", artist["name"])
+            st.write("Title:", artist["title"])
+            st.write("Bio:", artist["bio"])
+
+            if os.path.exists(artist["image_path"]):
+                st.image(artist["image_path"])
+
+            col1, col2 = st.columns(2)
+
+            if col1.button(f"Approve {artist['title']}"):
+                artist["status"] = "Approved"
+                save_artists(artists)
+                st.rerun()
+
+            if col2.button(f"Reject {artist['title']}"):
+                artists.remove(artist)
+                save_artists(artists)
+                st.rerun()
